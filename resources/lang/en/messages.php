@@ -20,28 +20,35 @@ return [
     'notifications' => 'Notifications',
     'click_to_expand' => '(click to expand)',
     'new' => 'New',
+    'new_notification' => 'New Notification',
     'notification_details' => 'Notification Details',
     'type' => 'Type',
     'created' => 'Created',
     'read_at' => 'Read At',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Notification Messages
-    |--------------------------------------------------------------------------
-    |
-    | Add your application's notification messages here.
-    | These are used by the controller's getNotificationMessage() method.
-    |
-    */
+    // Bulk actions
+    'delete_read' => 'Delete Read',
+    'delete_all' => 'Delete All',
+    'read_deleted' => ':count read notification(s) deleted.',
+    'all_deleted' => ':count notification(s) deleted.',
+    'confirm_delete_read' => 'Delete all read notifications?',
+    'confirm_delete_all' => 'Delete ALL notifications? This cannot be undone.',
 
-    // Add your application's notification messages here.
-    // These are used by the controller's getNotificationMessage() switch statement.
-    // Use Laravel's :placeholder syntax for variable substitution.
-    //
-    // Examples:
-    // 'greeting' => 'Hello :name,',
-    // 'payment_received' => 'Payment received for order #:order_number (:amount)',
-    // 'subscription_expiring' => 'Subscription :name expires in :days days',
+    // Broadcast
+    'broadcast' => 'Broadcast',
+    'send_notification' => 'Send Notification',
+    'message' => 'Message',
+    'broadcast_placeholder' => 'Type your notification message...',
+    'target' => 'Target',
+    'all_users' => 'All Users',
+    'specific_role' => 'Specific Role',
+    'role' => 'Role',
+    'icon' => 'Icon',
+    'color' => 'Color',
+    'send' => 'Send Notification',
+    'preview' => 'Preview',
+    'confirm_broadcast' => 'Send this notification to all selected users?',
+    'broadcast_sent' => 'Notification sent to :count user(s).',
+    'back_to_notifications' => 'Back to Notifications',
 
 ];

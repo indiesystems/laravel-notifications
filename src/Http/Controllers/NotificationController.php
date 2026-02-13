@@ -2,9 +2,13 @@
 
 namespace IndieSystems\Notifications\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
+use IndieSystems\Notifications\Notifications\BroadcastNotification;
 
 class NotificationController extends Controller
 {
@@ -12,26 +16,38 @@ class NotificationController extends Controller
     {
         $query = Auth::user()->notifications();
 
-        // Filter by read/unread
-        if ($request->has('unread')) {
+        $filter = $request->get('filter', 'all');
+        if ($filter === 'unread') {
             $query->whereNull('read_at');
+        } elseif ($filter === 'read') {
+            $query->whereNotNull('read_at');
         }
 
-        // Paginate
         $notifications = $query->latest()->paginate(config('indie-notifications.per_page', 20));
 
-        // Format notifications with human-readable messages
+        // Preserve filter in pagination links
+        $notifications->appends($request->only('filter'));
+
+        // Format notifications
         $notifications->getCollection()->transform(function ($notification) {
             $notification->formatted_message = $this->getNotificationMessage($notification);
             $notification->icon = $this->getNotificationIcon($notification);
             $notification->color = $this->getNotificationColor($notification);
-
+            $notification->url = $notification->data['url'] ?? null;
             return $notification;
         });
+
+        $unreadCount = Auth::user()->unreadNotifications()->count();
+        $readCount = Auth::user()->readNotifications()->count();
+        $totalCount = Auth::user()->notifications()->count();
 
         return view('indie-notifications::notifications.index', [
             'title' => __('indie-notifications::messages.title'),
             'notifications' => $notifications,
+            'filter' => $filter,
+            'unreadCount' => $unreadCount,
+            'readCount' => $readCount,
+            'totalCount' => $totalCount,
         ]);
     }
 
@@ -43,13 +59,12 @@ class NotificationController extends Controller
             ->limit(config('indie-notifications.recent_limit', 10))
             ->get();
 
-        // Format notifications
         $notifications->transform(function ($notification) {
             $notification->formatted_message = $this->getNotificationMessage($notification);
             $notification->icon = $this->getNotificationIcon($notification);
             $notification->color = $this->getNotificationColor($notification);
             $notification->created_at_human = $notification->created_at->diffForHumans();
-
+            $notification->url = $notification->data['url'] ?? null;
             return $notification;
         });
 
@@ -68,9 +83,14 @@ class NotificationController extends Controller
 
         $notification->markAsRead();
 
-        // Return JSON for AJAX requests, redirect for regular form submissions
         if (request()->wantsJson() || request()->ajax()) {
             return response()->json(['success' => true]);
+        }
+
+        // Redirect to notification URL if it has one
+        $url = $notification->data['url'] ?? null;
+        if ($url) {
+            return redirect($url);
         }
 
         return redirect()->back();
@@ -106,43 +126,93 @@ class NotificationController extends Controller
         return redirect()->back()->with('success', __('indie-notifications::messages.deleted'));
     }
 
+    public function destroyRead()
+    {
+        $count = Auth::user()->readNotifications()->count();
+        Auth::user()->readNotifications()->delete();
+
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json(['success' => true, 'count' => $count]);
+        }
+
+        return redirect()->back()->with('success', __('indie-notifications::messages.read_deleted', ['count' => $count]));
+    }
+
+    public function destroyAll()
+    {
+        $count = Auth::user()->notifications()->count();
+        Auth::user()->notifications()->delete();
+
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json(['success' => true, 'count' => $count]);
+        }
+
+        return redirect()->back()->with('success', __('indie-notifications::messages.all_deleted', ['count' => $count]));
+    }
+
+    /**
+     * Show broadcast form (admin).
+     */
+    public function broadcastForm()
+    {
+        $roles = [];
+        if (class_exists('Spatie\\Permission\\Models\\Role')) {
+            $roles = \Spatie\Permission\Models\Role::orderBy('name')->pluck('name')->toArray();
+        }
+
+        return view('indie-notifications::notifications.broadcast', [
+            'roles' => $roles,
+            'userCount' => User::count(),
+        ]);
+    }
+
+    /**
+     * Send broadcast notification (admin).
+     */
+    public function broadcastSend(Request $request)
+    {
+        $request->validate([
+            'message' => 'required|string|max:500',
+            'icon' => 'nullable|string|max:50',
+            'color' => 'nullable|string|in:primary,secondary,success,danger,warning,info',
+            'target' => 'required|in:all,role',
+            'role' => 'required_if:target,role|nullable|string',
+        ]);
+
+        $query = User::query();
+
+        if ($request->get('target') === 'role' && $request->get('role')) {
+            $query->role($request->get('role'));
+        }
+
+        $users = $query->get();
+        $count = $users->count();
+
+        Notification::send($users, new BroadcastNotification(
+            message: $request->get('message'),
+            icon: $request->get('icon', 'fa-bullhorn'),
+            color: $request->get('color', 'info'),
+            sentBy: Auth::user()->name,
+        ));
+
+        return redirect()->route('notifications.broadcast')
+            ->with('success', __('indie-notifications::messages.broadcast_sent', ['count' => $count]));
+    }
+
     /**
      * Get formatted message for a notification.
-     *
-     * Resolution order:
-     * 1. $notification->data['message'] - if the notification class includes it in toArray()
-     * 2. Switch statement for known notification types (add your app's types here)
-     * 3. Falls back to the class basename
      */
     protected function getNotificationMessage($notification): string
     {
         $data = $notification->data;
 
-        // 1. Check if notification data includes a pre-formatted message
         if (isset($data['message'])) {
             return $data['message'];
         }
 
-        // 2. Format based on notification type
         $className = class_basename($notification->type);
 
         switch ($className) {
-            //
-            // Add your application's notification types here. Examples:
-            //
-            // case 'PaymentReceived':
-            //     return __('indie-notifications::messages.payment_received', [
-            //         'order_number' => $data['order_number'] ?? '?',
-            //         'amount' => '$' . number_format(($data['amount'] ?? 0) / 100, 2),
-            //     ]);
-            //
-            // case 'SubscriptionExpiring':
-            //     return __('indie-notifications::messages.subscription_expiring', [
-            //         'name' => $data['subscription_name'] ?? 'Subscription',
-            //         'days' => $data['days_until_expiry'] ?? '?',
-            //     ]);
-            //
-
             default:
                 return $className;
         }
@@ -150,22 +220,15 @@ class NotificationController extends Controller
 
     /**
      * Get icon for a notification.
-     *
-     * Resolution order:
-     * 1. $notification->data['icon'] - if the notification class includes it in toArray()
-     * 2. Config map (indie-notifications.icons)
-     * 3. Falls back to 'fa-bell'
      */
     protected function getNotificationIcon($notification): string
     {
         $data = $notification->data;
 
-        // 1. Check notification data
         if (isset($data['icon'])) {
             return $data['icon'];
         }
 
-        // 2. Check config map
         $className = class_basename($notification->type);
         $icons = config('indie-notifications.icons', []);
 
@@ -174,33 +237,16 @@ class NotificationController extends Controller
 
     /**
      * Get color for a notification.
-     *
-     * Resolution order:
-     * 1. $notification->data['color'] - if the notification class includes it in toArray()
-     * 2. Config map (indie-notifications.colors)
-     * 3. Falls back to 'info'
      */
     protected function getNotificationColor($notification): string
     {
         $data = $notification->data;
 
-        // 1. Check notification data
         if (isset($data['color'])) {
             return $data['color'];
         }
 
-        // 2. Check config map
         $className = class_basename($notification->type);
-
-        // Special handling for announcements (color based on severity)
-        if ($className === 'AnnouncementNotification') {
-            return match ($data['severity'] ?? 'info') {
-                'critical' => 'danger',
-                'warning' => 'warning',
-                default => 'info',
-            };
-        }
-
         $colors = config('indie-notifications.colors', []);
 
         return $colors[$className] ?? 'info';

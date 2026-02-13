@@ -3,6 +3,8 @@
 namespace IndieSystems\Notifications;
 
 use Illuminate\Support\ServiceProvider;
+use IndieSystems\Notifications\Console\InstallCommand;
+use IndieSystems\Notifications\Console\PruneCommand;
 
 class IndieNotificationsServiceProvider extends ServiceProvider
 {
@@ -17,28 +19,31 @@ class IndieNotificationsServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'indie-notifications');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'indie-notifications');
 
-        if ($this->app->runningInConsole()) {
-            // Config
-            $this->publishes([
-                __DIR__.'/../config/indie-notifications.php' => config_path('indie-notifications.php'),
-            ], 'indie-notifications-config');
+        $this->commands([
+            InstallCommand::class,
+            PruneCommand::class,
+        ]);
 
-            // Views
-            $this->publishes([
-                __DIR__.'/../resources/views' => resource_path('views/vendor/indie-notifications'),
-            ], 'indie-notifications-views');
+        // Config
+        $this->publishes([
+            __DIR__.'/../config/indie-notifications.php' => config_path('indie-notifications.php'),
+        ], 'indie-notifications-config');
 
-            // Translations
-            $this->publishes([
-                __DIR__.'/../resources/lang' => lang_path('vendor/indie-notifications'),
-            ], 'indie-notifications-lang');
+        // Views
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/indie-notifications'),
+        ], 'indie-notifications-views');
 
-            // Publish everything
-            $this->publishes([
-                __DIR__.'/../config/indie-notifications.php' => config_path('indie-notifications.php'),
-                __DIR__.'/../resources/views' => resource_path('views/vendor/indie-notifications'),
-                __DIR__.'/../resources/lang' => lang_path('vendor/indie-notifications'),
-            ], 'indie-notifications');
-        }
+        // Translations
+        $this->publishes([
+            __DIR__.'/../resources/lang' => lang_path('vendor/indie-notifications'),
+        ], 'indie-notifications-lang');
+
+        // Publish everything
+        $this->publishes([
+            __DIR__.'/../config/indie-notifications.php' => config_path('indie-notifications.php'),
+            __DIR__.'/../resources/views' => resource_path('views/vendor/indie-notifications'),
+            __DIR__.'/../resources/lang' => lang_path('vendor/indie-notifications'),
+        ], 'indie-notifications');
     }
 }

@@ -4,7 +4,7 @@
     Include this before </body> in your layout:
         @include('indie-notifications::partials.bell-scripts')
 
-    This powers the bell dropdown: AJAX loading, mark-as-read, auto-refresh.
+    This powers the bell dropdown: AJAX loading, mark-as-read, auto-refresh, toast alerts.
     Handles deferred jQuery loading (Vite, module scripts, etc.)
 --}}
 
@@ -18,12 +18,19 @@
 
     $(document).ready(function() {
         var notificationReadUrl = '{{ route("notifications.read", ["id" => "__ID__"]) }}';
+        var lastUnreadCount = -1;
 
         function loadNotifications() {
             $.ajax({
                 url: '{{ route("notifications.recent") }}',
                 method: 'GET',
                 success: function(response) {
+                    // Toast on new notifications (skip initial load)
+                    if (lastUnreadCount >= 0 && response.unread_count > lastUnreadCount) {
+                        var diff = response.unread_count - lastUnreadCount;
+                        showNotificationToast(diff, response.notifications);
+                    }
+                    lastUnreadCount = response.unread_count;
                     updateNotificationBell(response);
                 },
                 error: function(xhr) {
@@ -32,23 +39,36 @@
             });
         }
 
+        function showNotificationToast(count, notifications) {
+            // Find the newest unread notification for the toast message
+            var newest = null;
+            for (var i = 0; i < notifications.length; i++) {
+                if (!notifications[i].read_at) {
+                    newest = notifications[i];
+                    break;
+                }
+            }
+            var msg = newest ? newest.formatted_message : (count + ' new notification' + (count > 1 ? 's' : ''));
+
+            if (typeof toastr !== 'undefined') {
+                toastr.info(msg, '{{ __("indie-notifications::messages.new_notification") }}');
+            }
+        }
+
         function updateNotificationBell(data) {
             var unreadCount = data.unread_count;
             var $unreadBadge = $('#unread-count');
             var $notificationsList = $('#notifications-list');
             var $countText = $('#notification-count-text');
 
-            // Update unread count badge
             if (unreadCount > 0) {
                 $unreadBadge.text(unreadCount > 99 ? '99+' : unreadCount).show();
             } else {
                 $unreadBadge.hide();
             }
 
-            // Update header text
             $countText.text(unreadCount + ' ' + (unreadCount === 1 ? '{{ __("indie-notifications::messages.notification") }}' : '{{ __("indie-notifications::messages.notifications") }}'));
 
-            // Update notifications list
             if (data.notifications.length === 0) {
                 $notificationsList.html(
                     '<div class="dropdown-item-text text-center text-muted">' +
@@ -60,7 +80,12 @@
                 data.notifications.forEach(function(notification) {
                     var message = notification.formatted_message || 'New notification';
                     var timeAgo = notification.created_at_human || notification.created_at;
-                    html += '<a href="#" class="dropdown-item notification-item" data-id="' + notification.id + '">' +
+                    var url = notification.url;
+                    var unreadDot = notification.read_at ? '' : '<span class="badge badge-warning" style="width:8px;height:8px;padding:0;border-radius:50;position:absolute;top:8px;right:8px;"></span>';
+
+                    html += '<a href="#" class="dropdown-item notification-item" data-id="' + notification.id + '"' +
+                        (url ? ' data-url="' + url + '"' : '') +
+                        ' style="position:relative;white-space:normal;">' + unreadDot +
                         '<div class="media">' +
                         '<i class="fas ' + notification.icon + ' text-' + notification.color + ' mr-3 mt-1"></i>' +
                         '<div class="media-body">' +
@@ -74,10 +99,12 @@
             }
         }
 
-        // Mark notification as read when clicked
+        // Mark notification as read when clicked — navigate to URL if available
         $(document).on('click', '.notification-item', function(e) {
             e.preventDefault();
-            var notificationId = $(this).data('id');
+            var $item = $(this);
+            var notificationId = $item.data('id');
+            var url = $item.data('url');
 
             $.ajax({
                 url: notificationReadUrl.replace('__ID__', notificationId),
@@ -86,7 +113,11 @@
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
                 success: function() {
-                    loadNotifications();
+                    if (url) {
+                        window.location.href = url;
+                    } else {
+                        loadNotifications();
+                    }
                 }
             });
         });
