@@ -102,15 +102,7 @@ The views assume these are loaded (standard AdminLTE stack):
 
 All AJAX URLs are generated server-side via `route()` helper, so they work regardless of app base path or route prefix.
 
-### Fixes Applied vs Original central-indie Code
-
-- **markAllAsRead()** - Original returned `redirect()->back()` for all requests, but the bell dropdown calls it via AJAX and expects JSON. Fixed to check `request()->wantsJson() || request()->ajax()`.
-- **Bell dropdown mark-as-read URL** - Original used hardcoded `/notifications/{id}/read` path. Fixed to use `route()` helper so it works with any route prefix or app base path.
-- **Index page inline JS** - Original used `@push('scripts')` which requires `@stack('scripts')` in the layout (the original layout used `@yield('scripts')`, so this was silently broken). Fixed to use inline `<script>` inside the content section - works with any layout.
-- **Notifications migration** - Removed. This is Laravel's standard `notifications` table (`php artisan notifications:table`). Not our table to own.
-- **Spatie migration** - Removed. Spatie's package auto-loads its own `notification_log_items` migration. Duplicating it would cause "table already exists" errors.
-
-## Installation in a New App
+## Installation
 
 ### 1. Add to composer.json
 
@@ -255,10 +247,11 @@ See `src/Notifications/Examples/` for:
 ## File Structure
 
 ```
-├── composer.json
+src/
+├── IndieNotificationsServiceProvider.php
 ├── config/
 │   ├── indie-notifications.php      # Main config (icons, colors, routes, etc.)
-│   └── notification-log.php         # Reference copy of Spatie's config (not auto-published)
+│   └── notification-log.php         # Reference copy of Spatie's config
 ├── resources/
 │   ├── lang/en/messages.php         # All UI + notification message translations
 │   └── views/
@@ -269,31 +262,26 @@ See `src/Notifications/Examples/` for:
 │           └── bell-scripts.blade.php   # Bell widget JavaScript
 ├── routes/
 │   └── web.php                      # 5 notification routes
-└── src/
-    ├── IndieNotificationsServiceProvider.php
-    ├── Http/Controllers/
-    │   └── NotificationController.php
-    └── Notifications/Examples/
-        ├── SampleNotification.php
-        └── SampleNotificationWithDedup.php
+├── Console/
+│   ├── InstallCommand.php
+│   └── PruneCommand.php
+├── Http/Controllers/
+│   └── NotificationController.php
+└── Notifications/Examples/
+    ├── SampleNotification.php
+    └── SampleNotificationWithDedup.php
 ```
 
 Note: No migrations are shipped. The `notifications` table is Laravel's standard (`php artisan notifications:table`). The `notification_log_items` table is provided by `spatie/laravel-notification-log` which auto-discovers its own service provider + migration.
 
-## What's NOT in This Package (add per app)
+## What's NOT in This Package
 
-- **Actual notification classes** - These are app-specific. Use the examples as templates.
-- **Event listeners/subscribers** - Wire up your app's events to dispatch notifications.
-- **Announcements system** - central-indie has a full announcements system with targeting, scheduling, etc. This package only covers the core notifications infrastructure.
-- **Broadcasting/WebSocket** - Infrastructure exists in central-indie (Echo channel 'alerts') but is disabled. Can be added later.
-- **Per-user notification preferences** - Settings are system/plan-level via SettingsService. User-level prefs can be added.
-- **SMS/Slack/Push channels** - Only mail + database channels. Add more as needed.
+- **Actual notification classes** — These are app-specific. Use the examples as templates.
+- **Event listeners/subscribers** — Wire up your app's events to dispatch notifications.
+- **Announcements system** — Not included. This package covers core notification infrastructure only.
+- **Per-user notification preferences** — User-level prefs can be added per app.
+- **SMS/Slack/Push channels** — Only mail + database channels. Add more as needed.
 
-## Origin
+## License
 
-Extracted from `central-indie` (Laravel 10 SaaS). The original code uses:
-- `spatie/laravel-notification-log ^1.3` for audit trail + dedup
-- AdminLTE 3 + Bootstrap 4 for UI
-- jQuery for AJAX notification management
-- FontAwesome 5 for icons
-- toastr.js for toast messages
+MIT
