@@ -1,8 +1,22 @@
 {
     "name": "indiesystems/laravel-notifications",
     "description": "Generic notification system for Laravel applications with AdminLTE UI - bell dropdown, full page, read/unread management, Spatie notification log integration",
+    "keywords": ["laravel", "notifications", "adminlte", "bell", "dropdown", "read-unread"],
     "type": "library",
-    "license": "proprietary",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Chris Dimas",
+            "email": "chris@indie.systems",
+            "homepage": "https://indie.systems",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "https://github.com/indiesystems/laravel-notifications",
+    "support": {
+        "issues": "https://github.com/indiesystems/laravel-notifications/issues",
+        "source": "https://github.com/indiesystems/laravel-notifications"
+    },
     "require": {
         "php": "^8.1",
         "illuminate/support": "^10.0|^11.0",
